@@ -40,6 +40,7 @@ defmodule RabbitMQCtl.MixfileBase do
                     rabbitmqctl: :ctl,
                     'rabbitmq-diagnostics': :diagnostics,
                     'rabbitmq-queues': :queues,
+                    'rabbitmq-streams': :streams,
                     'rabbitmq-upgrade': :upgrade]]
     ]
     |> add_modules(Mix.env)
