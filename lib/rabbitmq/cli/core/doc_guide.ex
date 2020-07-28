@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is Pivotal Software, Inc.
-## Copyright (c) 2016-2017 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2016-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Core.DocGuide.Macros do
   @moduledoc """
@@ -45,8 +36,8 @@ defmodule RabbitMQ.CLI.Core.DocGuide do
   Macros.defguide("alarms")
   Macros.defguide("disk_alarms")
   Macros.defguide("alternate_exchange", path_segment: "ae")
-  Macros.defguide("cli")
   Macros.defguide("channels")
+  Macros.defguide("cli")
   Macros.defguide("clustering")
   Macros.defguide("cluster_formation")
   Macros.defguide("connections")
@@ -54,7 +45,7 @@ defmodule RabbitMQ.CLI.Core.DocGuide do
   Macros.defguide("consumers")
   Macros.defguide("definitions")
   Macros.defguide("erlang_versions", path_segment: "which-erlang")
-  Macros.defguide("feature_flags", domain: "next.rabbitmq.com")
+  Macros.defguide("feature_flags")
   Macros.defguide("firehose")
   Macros.defguide("mirroring", path_segment: "ha")
   Macros.defguide("logging")
@@ -66,7 +57,7 @@ defmodule RabbitMQ.CLI.Core.DocGuide do
   Macros.defguide("publishers")
   Macros.defguide("plugins")
   Macros.defguide("queues")
-  Macros.defguide("quorum_queues", domain: "next.rabbitmq.com")
+  Macros.defguide("quorum_queues")
   Macros.defguide("stream_queues", domain: "next.rabbitmq.com")
   Macros.defguide("runtime_tuning", path_segment: "runtime")
   Macros.defguide("tls", path_segment: "ssl")

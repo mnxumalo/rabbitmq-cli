@@ -1,20 +1,11 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is Pivotal Software, Inc.
-## Copyright (c) 2016-2017 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2016-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Core.Distribution do
-  alias RabbitMQ.CLI.Core.{Config, Helpers}
+  alias RabbitMQ.CLI.Core.{ANSI, Config, Helpers}
 
   #
   # API
@@ -77,6 +68,7 @@ defmodule RabbitMQ.CLI.Core.Distribution do
 
       cookie ->
         Node.set_cookie(cookie)
+        maybe_warn_about_deprecated_rabbitmq_erlang_cookie_env_variable(options)
         :ok
     end
   end
@@ -108,5 +100,20 @@ defmodule RabbitMQ.CLI.Core.Distribution do
       {:error, _} = err -> throw(err)
       rmq_hostname      -> String.to_atom("rabbitmqcli-#{:os.getpid()}-#{rmq_hostname}")
     end
+  end
+
+  defp maybe_warn_about_deprecated_rabbitmq_erlang_cookie_env_variable(options) do
+      case System.get_env("RABBITMQ_ERLANG_COOKIE") do
+        nil -> :ok
+        _   ->
+          case Config.output_less?(options) do
+            true  -> :ok
+            false ->
+              warning = ANSI.bright_red("RABBITMQ_ERLANG_COOKIE env variable support is deprecated and will be REMOVED in a future version. ") <>
+                        ANSI.yellow("Use the $HOME/.erlang.cookie file or the --erlang-cookie switch instead.")
+
+              IO.puts(warning)
+          end
+      end
   end
 end

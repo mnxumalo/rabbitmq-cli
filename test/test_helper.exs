@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 four_hours = 240 * 60 * 1000
 ExUnit.configure(
@@ -243,7 +234,37 @@ defmodule TestHelper do
   #
 
   def await_rabbitmq_startup() do
-    :ok = :rabbit_misc.rpc_call(get_rabbit_hostname(), :rabbit, :await_startup, [])
+    await_rabbitmq_startup_with_retries(100)
+  end
+
+  def await_rabbitmq_startup_with_retries(0) do
+    throw({:error, "Failed to call rabbit.await_startup/0 with retries: node #{get_rabbit_hostname()} was down"})
+  end
+  def await_rabbitmq_startup_with_retries(retries_left) do
+    case :rabbit_misc.rpc_call(get_rabbit_hostname(), :rabbit, :await_startup, []) do
+      :ok ->
+          :ok
+      {:badrpc, :nodedown} ->
+          :timer.sleep(50)
+          await_rabbitmq_startup_with_retries(retries_left - 1)
+    end
+  end
+
+  def await_condition(fun, timeout) do
+    retries = Integer.floor_div(timeout, 50)
+    await_condition_with_retries(fun, retries)
+  end
+
+  def await_condition_with_retries(_fun, 0) do
+    throw({:error, "Condition did not materialize"})
+  end
+  def await_condition_with_retries(fun, retries_left) do
+    case fun.() do
+      true -> :ok
+      _    ->
+          :timer.sleep(50)
+          await_condition_with_retries(fun, retries_left - 1)
+    end
   end
 
   def is_rabbitmq_app_running() do
@@ -261,11 +282,22 @@ defmodule TestHelper do
     :timer.sleep(1200)
   end
 
+  def drain_node() do
+    :rpc.call(get_rabbit_hostname(), :rabbit_maintenance, :drain, [])
+  end
+
+  def revive_node() do
+    :rpc.call(get_rabbit_hostname(), :rabbit_maintenance, :revive, [])
+  end
+
+  def is_draining_node() do
+    node = get_rabbit_hostname()
+    :rpc.call(node, :rabbit_maintenance, :is_being_drained_local_read, [node])
+  end
+
   def status do
     :rpc.call(get_rabbit_hostname(), :rabbit, :status, [])
   end
-
-
 
   def error_check(cmd_line, code) do
     assert catch_exit(RabbitMQCtl.main(cmd_line)) == {:shutdown, code}
@@ -327,6 +359,23 @@ defmodule TestHelper do
     end)
   end
 
+  def await_no_client_connections(node, timeout) do
+    iterations = timeout / 10
+    await_no_client_connections_with_iterations(node, iterations)
+  end
+
+  def await_no_client_connections_with_iterations(_node, n) when n <= 0 do
+    flunk "Ran out of retries, still have active client connections"
+  end
+  def await_no_client_connections_with_iterations(node, n) when n > 0 do
+    case :rpc.call(node, :rabbit_networking, :connections_local, []) do
+      [] -> :ok
+      _xs ->
+        :timer.sleep(10)
+        await_no_client_connections_with_iterations(node, n - 1)
+    end
+  end
+
   def close_all_connections(node) do
     # we intentionally use connections_local/0 here because connections/0,
     # the cluster-wide version, loads some bits around cluster membership
@@ -337,6 +386,15 @@ defmodule TestHelper do
     for pid <- :rpc.call(node, :rabbit_networking, :connections_local, []) do
       :rpc.call(node, :rabbit_networking, :close_connection, [pid, :force_closed])
     end
+    await_no_client_connections(node, 5000)
+  end
+
+  def expect_client_connection_failure() do
+    expect_client_connection_failure("/")
+  end
+  def expect_client_connection_failure(vhost) do
+    Application.ensure_all_started(:amqp)
+    assert {:error, :econnrefused} == AMQP.Connection.open(virtual_host: vhost)
   end
 
   def delete_all_queues() do
@@ -455,6 +513,14 @@ defmodule TestHelper do
 
   def clear_vhost_limits(vhost) do
     :rpc.call(get_rabbit_hostname(), :rabbit_vhost_limit, :clear, [vhost, <<"acting-user">>])
+  end
+
+  def resume_all_client_listeners() do
+    :rpc.call(get_rabbit_hostname(), :rabbit_maintenance, :resume_all_client_listeners, [])
+  end
+
+  def suspend_all_client_listeners() do
+    :rpc.call(get_rabbit_hostname(), :rabbit_maintenance, :suspend_all_client_listeners, [])
   end
 
   def set_scope(scope) do

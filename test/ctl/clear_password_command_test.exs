@@ -8,7 +8,7 @@
 ## The Original Code is RabbitMQ.
 ##
 ## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 
 defmodule ClearPasswordCommandTest do
@@ -21,7 +21,6 @@ defmodule ClearPasswordCommandTest do
 
   setup_all do
     RabbitMQ.CLI.Core.Distribution.start()
-
 
     :ok
   end

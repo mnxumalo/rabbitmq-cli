@@ -8,7 +8,7 @@
 ## The Original Code is RabbitMQ.
 ##
 ## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 
 defmodule ClearPermissionsTest do
@@ -30,8 +30,6 @@ defmodule ClearPermissionsTest do
     on_exit([], fn ->
       delete_user(@user)
       delete_vhost(@specific_vhost)
-
-
     end)
 
     :ok

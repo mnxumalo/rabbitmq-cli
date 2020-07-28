@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Ctl.Commands.StatusCommand do
   alias RabbitMQ.CLI.Core.DocGuide
@@ -76,14 +67,30 @@ defmodule RabbitMQ.CLI.Ctl.Commands.StatusCommand do
   def output(result, %{node: node_name, unit: unit}) when is_list(result) do
     m = result_map(result)
 
+    product_name_section = case m do
+      %{:product_name => product_name} when product_name != "" ->
+        ["Product name: #{product_name}"]
+      _ ->
+        []
+    end
+    product_version_section = case m do
+      %{:product_version => product_version} when product_version != "" ->
+        ["Product version: #{product_version}"]
+      _ ->
+        []
+    end
+
     runtime_section = [
       "#{bright("Runtime")}\n",
       "OS PID: #{m[:pid]}",
       "OS: #{m[:os]}",
       # TODO: format
       "Uptime (seconds): #{m[:uptime]}",
-      "Product name: #{m[:product_name]}",
-      "Product version: #{m[:product_version]}",
+      "Is under maintenance?: #{m[:is_under_maintenance]}"
+    ] ++
+    product_name_section ++
+    product_version_section ++
+    [
       "RabbitMQ version: #{m[:rabbitmq_version]}",
       "Node name: #{node_name}",
       "Erlang configuration: #{m[:erlang_version]}",
@@ -100,7 +107,8 @@ defmodule RabbitMQ.CLI.Ctl.Commands.StatusCommand do
 
     data_directory_section = [
       "\n#{bright("Data directory")}\n",
-      "Node data directory: #{m[:data_directory]}"
+      "Node data directory: #{m[:data_directory]}",
+      "Raft data directory: #{m[:raft_data_directory]}"
     ]
 
     config_section = [
@@ -196,11 +204,12 @@ defmodule RabbitMQ.CLI.Ctl.Commands.StatusCommand do
     %{
       os: os_name(Keyword.get(result, :os)),
       pid: Keyword.get(result, :pid),
-      product_name: Keyword.get(result, :product_name, "RabbitMQ") |> to_string,
-      product_version: Keyword.get(result, :product_version, Keyword.get(result, :rabbitmq_version)) |> to_string,
+      product_name: Keyword.get(result, :product_name) |> to_string,
+      product_version: Keyword.get(result, :product_version) |> to_string,
       rabbitmq_version: Keyword.get(result, :rabbitmq_version) |> to_string,
       erlang_version: Keyword.get(result, :erlang_version) |> to_string |> String.trim_trailing,
       uptime: Keyword.get(result, :uptime),
+      is_under_maintenance: Keyword.get(result, :is_under_maintenance, false),
       processes: Enum.into(Keyword.get(result, :processes), %{}),
       run_queue: Keyword.get(result, :run_queue),
       net_ticktime: net_ticktime(result),
@@ -219,6 +228,8 @@ defmodule RabbitMQ.CLI.Ctl.Commands.StatusCommand do
       memory: Keyword.get(result, :memory) |> Enum.into(%{}),
 
       data_directory: Keyword.get(result, :data_directory) |> to_string,
+      raft_data_directory: Keyword.get(result, :raft_data_directory) |> to_string,
+
       config_files: Keyword.get(result, :config_files) |> Enum.map(&to_string/1),
       log_files: Keyword.get(result, :log_files) |> Enum.map(&to_string/1),
 

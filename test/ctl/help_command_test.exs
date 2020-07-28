@@ -1,24 +1,15 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 
 defmodule HelpCommandTest do
   use ExUnit.Case, async: false
   import TestHelper
 
-  alias RabbitMQ.CLI.Core.{CommandModules, ExitCodes}
+  alias RabbitMQ.CLI.Core.{CommandModules}
 
   @command RabbitMQ.CLI.Ctl.Commands.HelpCommand
 
@@ -27,8 +18,22 @@ defmodule HelpCommandTest do
     :ok
   end
 
+  test "validate: providing no position arguments passes validation" do
+    assert @command.validate([], %{}) == :ok
+  end
+
+  test "validate: providing one position argument passes validation" do
+    assert @command.validate(["status"], %{}) == :ok
+  end
+
+  test "validate: providing two or more position arguments fails validation" do
+    assert @command.validate(["extra1", "extra2"], %{}) ==
+      {:validation_failure, :too_many_args}
+  end
+
   test "run: prints basic usage info" do
-    output = @command.run([], %{})
+    {:ok, lines} = @command.run([], %{})
+    output = Enum.join(lines, "\n")
     assert output =~ ~r/[-n <node>] [-t <timeout>]/
     assert output =~ ~r/commands/i
   end
@@ -49,9 +54,6 @@ defmodule HelpCommandTest do
   end
 
   test "run prints command info" do
-    assert @command.run([], %{}) =~ ~r/commands/i
-
-    # Checks to verify that each module's command appears in the list.
     ctl_commands = CommandModules.module_map
     |> Enum.filter(fn({_name, command_mod}) ->
                      to_string(command_mod) =~ ~r/^RabbitMQ\.CLI\.Ctl\.Commands/
@@ -61,20 +63,14 @@ defmodule HelpCommandTest do
     Enum.each(
       ctl_commands,
       fn(command) ->
-        assert @command.run([], %{}) =~ ~r/\n\s+#{command}.*\n/
+        {:ok, lines} = @command.run([], %{})
+        output = Enum.join(lines, "\n")
+        assert output =~ ~r/\n\s+#{command}.*\n/
       end)
   end
 
-  test "run: exits with code of OK" do
-    assert @command.output("Help string", %{}) ==
-      {:error, ExitCodes.exit_ok, "Help string"}
-  end
-
-  test "run: no arguments print general help" do
-    assert @command.run([], %{}) =~ ~r/usage/i
-  end
-
-  test "run: unrecognised arguments print general help" do
-    assert @command.run(["extra1", "extra2"], %{}) =~ ~r/usage/i
+  test "run: exits with the code of OK" do
+    assert @command.output({:ok, "Help string"}, %{}) ==
+      {:ok, "Help string"}
   end
 end

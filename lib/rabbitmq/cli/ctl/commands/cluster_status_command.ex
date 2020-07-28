@@ -1,23 +1,14 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
   alias RabbitMQ.CLI.Core.DocGuide
   import RabbitMQ.CLI.Core.{Alarms, ANSI, Listeners, Platform, FeatureFlags}
   import RabbitMQ.CLI.Core.Distribution, only: [per_node_timeout: 2]
-  import Rabbitmq.Atom.Coerce
+  import RabbitMQ.CLI.Core.DataCoercion
 
   @behaviour RabbitMQ.CLI.CommandBehaviour
 
@@ -59,6 +50,8 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
             alarms_by_node    = Enum.map(nodes, fn n -> alarms_by_node(n, per_node_timeout(timeout, count)) end)
             listeners_by_node = Enum.map(nodes, fn n -> listeners_of(n, per_node_timeout(timeout, count)) end)
             versions_by_node  = Enum.map(nodes, fn n -> versions_by_node(n, per_node_timeout(timeout, count)) end)
+            maintenance_status_by_node  = Enum.map(nodes,
+                                            fn n -> maintenance_status_by_node(n, per_node_timeout(timeout, count)) end)
 
             feature_flags = case :rabbit_misc.rpc_call(node_name, :rabbit_ff_extra, :cli_info, [], timeout) do
                               {:badrpc, {:EXIT, {:undef, _}}} -> []
@@ -66,7 +59,12 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
                               val                   -> val
                             end
 
-            status ++ [{:alarms, alarms_by_node}] ++ [{:listeners, listeners_by_node}] ++ [{:versions, versions_by_node}] ++ [{:feature_flags, feature_flags}]
+            status ++
+            [{:alarms, alarms_by_node}] ++
+            [{:listeners, listeners_by_node}] ++
+            [{:versions, versions_by_node}] ++
+            [{:maintenance_status, maintenance_status_by_node}] ++
+            [{:feature_flags, feature_flags}]
         end
     end
   end
@@ -141,6 +139,10 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
                                                end)
          end
 
+    maintenance_section = [
+      "\n#{bright("Maintenance status")}\n",
+    ] ++ maintenance_lines(m[:maintenance_status])
+
     feature_flags_section = [
       "\n#{bright("Feature flags")}\n"
     ] ++ case Enum.count(m[:feature_flags]) do
@@ -149,7 +151,8 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
          end
 
     lines = cluster_name_section ++ disk_nodes_section ++ ram_nodes_section ++ running_nodes_section ++
-            versions_section ++ alarms_section ++ partitions_section ++ listeners_section ++ feature_flags_section
+            versions_section ++ maintenance_section ++ alarms_section ++ partitions_section ++
+            listeners_section ++ feature_flags_section
 
     {:ok, Enum.join(lines, line_separator())}
   end
@@ -193,6 +196,7 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
       ram_nodes: result |> Keyword.get(:nodes, []) |> Keyword.get(:ram, []),
       running_nodes: result |> Keyword.get(:running_nodes, []) |> Enum.map(&to_string/1),
       alarms: Keyword.get(result, :alarms) |> Keyword.values |> Enum.concat |> Enum.uniq,
+      maintenance_status: Keyword.get(result, :maintenance_status, []) |> Enum.into(%{}),
       partitions: Keyword.get(result, :partitions, []) |> Enum.into(%{}),
       listeners: Keyword.get(result, :listeners, []) |> Enum.into(%{}),
       versions: Keyword.get(result, :versions, []) |> Enum.into(%{}),
@@ -223,13 +227,42 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
   end
 
   defp versions_by_node(node, timeout) do
-    {rmq_vsn, otp_vsn} = case :rabbit_misc.rpc_call(
-                          to_atom(node), :rabbit_misc, :rabbitmq_and_erlang_versions, [], timeout) do
-      {:badrpc, _} -> {nil, nil}
-      pair         -> pair
+    {rmq_name, rmq_vsn, otp_vsn} = case :rabbit_misc.rpc_call(
+                          to_atom(node), :rabbit, :product_info, [], timeout) do
+      {:badrpc, _} ->
+        {nil, nil, nil}
+      map ->
+        %{:otp_release => otp} = map
+        name = case map do
+          %{:product_name => v} -> v
+          %{:product_base_name => v} -> v
+        end
+        vsn = case map do
+          %{:product_version => v} -> v
+          %{:product_base_version => v} -> v
+        end
+        {name, vsn, otp}
     end
 
-    {node, %{rabbitmq_version: to_string(rmq_vsn), erlang_version: to_string(otp_vsn)}}
+    {node, %{rabbitmq_name: to_string(rmq_name), rabbitmq_version: to_string(rmq_vsn), erlang_version: to_string(otp_vsn)}}
+  end
+
+  defp maintenance_status_by_node(node, timeout) do
+    target = to_atom(node)
+    result = case :rabbit_misc.rpc_call(target,
+                       :rabbit_maintenance, :status_local_read, [target], timeout) do
+      {:badrpc, _} -> "unknown"
+      :regular     -> "not under maintenance"
+      :draining    -> magenta("marked for maintenance")
+      # forward compatibility: should we figure out a way to know when
+      # draining completes (it involves inherently asynchronous cluster
+      # operations such as quorum queue leader re-election), we'd introduce
+      # a new state
+      :drained     -> magenta("marked for maintenance")
+      value        -> to_string(value)
+    end
+
+    {node, result}
   end
 
   defp node_lines(nodes) do
@@ -237,12 +270,16 @@ defmodule RabbitMQ.CLI.Ctl.Commands.ClusterStatusCommand do
   end
 
   defp version_lines(mapping) do
-    Enum.map(mapping, fn {node, %{rabbitmq_version: rmq_vsn, erlang_version: otp_vsn}} ->
-                        "#{node}: RabbitMQ #{rmq_vsn} on Erlang #{otp_vsn}"
+    Enum.map(mapping, fn {node, %{rabbitmq_name: rmq_name, rabbitmq_version: rmq_vsn, erlang_version: otp_vsn}} ->
+                        "#{node}: #{rmq_name} #{rmq_vsn} on Erlang #{otp_vsn}"
                       end)
   end
 
   defp partition_lines(mapping) do
     Enum.map(mapping, fn {node, unreachable_peers} -> "Node #{node} cannot communicate with #{Enum.join(unreachable_peers, ", ")}" end)
+  end
+
+  defp maintenance_lines(mapping) do
+    Enum.map(mapping, fn {node, status} -> "Node: #{node}, status: #{status}" end)
   end
 end

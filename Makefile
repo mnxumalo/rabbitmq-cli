@@ -10,12 +10,19 @@ DEP_EARLY_PLUGINS = rabbit_common/mk/rabbitmq-early-plugin.mk
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-plugin.mk
 
 VERBOSE_TEST ?= true
+MAX_CASES ?= 1
+
+MIX_TEST = mix test --max-cases=$(MAX_CASES)
 
 ifeq ($(VERBOSE_TEST),true)
-MIX_TEST = mix test --trace
-else
-MIX_TEST = mix test --max-cases=1
+MIX_TEST := $(MIX_TEST) --trace
 endif
+
+# FIXME: Use erlang.mk patched for RabbitMQ, while waiting for PRs to be
+# reviewed and merged.
+
+ERLANG_MK_REPO = https://github.com/rabbitmq/erlang.mk.git
+ERLANG_MK_COMMIT = rabbitmq-tmp
 
 WITHOUT = plugins/cover \
 	  plugins/ct \
@@ -31,12 +38,6 @@ include erlang.mk
 # source archive. It sets some environment variables to allow
 # rabbitmq_cli to build offline, using the bundled sources only.
 -include rabbitmq-mix.mk
-
-# FIXME: Use erlang.mk patched for RabbitMQ, while waiting for PRs to be
-# reviewed and merged.
-
-ERLANG_MK_REPO = https://github.com/rabbitmq/erlang.mk.git
-ERLANG_MK_COMMIT = rabbitmq-tmp
 
 ACTUAL_ESCRIPTS = escript/rabbitmqctl
 LINKED_ESCRIPTS = escript/rabbitmq-plugins \
@@ -121,7 +122,7 @@ test:: $(ESCRIPTS)
 ifdef TEST_FILE
 	$(gen_verbose) $(MIX_TEST) $(TEST_FILE)
 else
-	$(verbose) echo "TEST_FILE must be set, e.g. TEST_FILE=./test/close_all_connections_command_test.exs" 1>&2; false
+	$(verbose) echo "TEST_FILE must be set, e.g. TEST_FILE=./test/ctl" 1>&2; false
 endif
 
 dialyzer:: $(ESCRIPTS)

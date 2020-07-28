@@ -1,19 +1,17 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is Pivotal Software, Inc.
-## Copyright (c) 2016-2017 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2016-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Ctl.Commands.HipeCompileCommand do
+  @moduledoc """
+  HiPE support has been deprecated since Erlang/OTP 22 (mid-2019) and
+  won't be a part of Erlang/OTP 24.
+
+  Therefore this command is DEPRECATED and is no-op.
+  """
+
   alias RabbitMQ.CLI.Core.{DocGuide, Validators}
   import RabbitMQ.CLI.Core.CodePath
 
@@ -59,11 +57,9 @@ defmodule RabbitMQ.CLI.Ctl.Commands.HipeCompileCommand do
 
   def validate(_, _), do: {:validation_failure, :too_many_args}
 
-  def run([target_dir], _opts) do
-    Code.ensure_loaded(:rabbit_hipe)
-    hipe_compile(String.trim(target_dir))
+  def run([_target_dir], _opts) do
+    :ok
   end
-
   use RabbitMQ.CLI.DefaultOutput
 
   def usage, do: "hipe_compile <directory>"
@@ -81,15 +77,14 @@ defmodule RabbitMQ.CLI.Ctl.Commands.HipeCompileCommand do
     ]
   end
 
-  def help_section(), do: :operations
+  def help_section(), do: :deprecated
 
   def description() do
-    "Only exists for backwards compatibility. HiPE support has been dropped starting with Erlang 22. "
-    <> "Do not use"
+    "DEPRECATED. This command is a no-op. HiPE is no longer supported by modern Erlang versions"
   end
 
-  def banner([target_dir], _) do
-    "Will pre-compile RabbitMQ server modules with HiPE to #{target_dir} ..."
+  def banner([_target_dir], _) do
+    "This command is a no-op. HiPE is no longer supported by modern Erlang versions"
   end
 
   #
@@ -99,19 +94,5 @@ defmodule RabbitMQ.CLI.Ctl.Commands.HipeCompileCommand do
   # Accepts any non-blank path
   defp acceptable_path?(value) do
     String.length(String.trim(value)) != 0
-  end
-
-  defp hipe_compile(target_dir) do
-    case :rabbit_hipe.can_hipe_compile() do
-      true ->
-        case :rabbit_hipe.compile_to_directory(target_dir) do
-          {:ok, _, _} -> :ok
-          {:ok, :already_compiled} -> {:ok, "already compiled"}
-          {:error, message} -> {:error, message}
-        end
-
-      false ->
-        {:error, "HiPE compilation is not supported"}
-    end
   end
 end

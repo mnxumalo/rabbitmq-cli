@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Ctl.Commands.NodeHealthCheckCommand do
   alias RabbitMQ.CLI.Core.DocGuide
@@ -65,7 +56,7 @@ defmodule RabbitMQ.CLI.Ctl.Commands.NodeHealthCheckCommand do
 
   def output({:healthcheck_failed, message}, _) do
     {:error, RabbitMQ.CLI.Core.ExitCodes.exit_software(),
-     "Error: healthcheck failed. Message: #{message}"}
+     "Error: health check failed. Message: #{message}"}
   end
 
   use RabbitMQ.CLI.DefaultOutput
@@ -78,10 +69,19 @@ defmodule RabbitMQ.CLI.Ctl.Commands.NodeHealthCheckCommand do
     ]
   end
 
-  def help_section(), do: :observability_and_health_checks
-  def description(), do: "Performs several opinionated health checks of the target node"
+  def help_section(), do: :deprecated
+  def description() do
+    "DEPRECATED. Performs intrusive, opinionated health checks on a fully booted node. " <>
+    "See https://www.rabbitmq.com/monitoring.html#health-checks instead"
+  end
 
   def banner(_, %{node: node_name, timeout: timeout}) do
-    ["Timeout: #{trunc(timeout / 1000)} seconds ...", "Checking health of node #{node_name} ..."]
+    [
+      "This command is DEPRECATED and will be removed in a future version.",
+      "It performs intrusive, opinionated health checks and requires a fully booted node.",
+      "Use one of the options covered in https://www.rabbitmq.com/monitoring.html#health-checks instead.",
+      "Timeout: #{trunc(timeout / 1000)} seconds ...",
+      "Checking health of node #{node_name} ..."
+    ]
   end
 end

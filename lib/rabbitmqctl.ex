@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQCtl do
   alias RabbitMQ.CLI.Core.{
@@ -36,11 +27,6 @@ defmodule RabbitMQCtl do
     handle_shutdown(:ok)
   end
 
-  def main(["--auto-complete", script_name | args]) do
-    script_basename = Path.basename(script_name)
-    auto_complete(script_basename, args)
-  end
-
   def main(unparsed_command) do
     exec_command(unparsed_command, &process_output/3)
     |> handle_shutdown
@@ -53,20 +39,21 @@ defmodule RabbitMQCtl do
     # same thing.
     {:error, ExitCodes.exit_usage(), HelpCommand.all_usage(parsed_options)};
   end
-
   def exec_command(["--help"] = unparsed_command, _) do
     {_args, parsed_options, _} = Parser.parse_global(unparsed_command)
 
     # the user asked for --help and we are displaying it to her,
     # reporting a success
-    {:ok, ExitCodes.exit_ok(), HelpCommand.all_usage(parsed_options)};
+    {:ok, ExitCodes.exit_ok(), Enum.join(HelpCommand.all_usage(parsed_options), "")};
   end
-
   def exec_command(["--version"] = _unparsed_command, opts) do
     # rewrite `--version` as `version`
     exec_command(["version"], opts)
   end
-
+  def exec_command(["--auto-complete" | args], opts) do
+    # rewrite `--auto-complete` as `autocomplete`
+    exec_command(["autocomplete" | args], opts)
+  end
   def exec_command(unparsed_command, output_fun) do
     {command, command_name, arguments, parsed_options, invalid} = Parser.parse(unparsed_command)
 
@@ -80,7 +67,7 @@ defmodule RabbitMQCtl do
 
         usage_string =
           command_not_found_string <>
-            HelpCommand.all_usage(parsed_options)
+            Enum.join(HelpCommand.all_usage(parsed_options), "")
 
         {:error, ExitCodes.exit_usage(), usage_string}
 
@@ -245,14 +232,6 @@ defmodule RabbitMQCtl do
   end
 
   defp handle_shutdown(_) do
-    exit_program(ExitCodes.exit_ok())
-  end
-
-  def auto_complete(script_name, args) do
-    Rabbitmq.CLI.AutoComplete.complete(script_name, args)
-    |> Stream.map(&IO.puts/1)
-    |> Stream.run()
-
     exit_program(ExitCodes.exit_ok())
   end
 
@@ -477,9 +456,14 @@ defmodule RabbitMQCtl do
     op = CommandModules.module_to_command(module)
 
     {:error, ExitCodes.exit_code_for(result),
-     "Error: operation #{op} on node #{opts[:node]} timed out. Timeout value used: #{
-       opts[:timeout]
-     }"}
+     "Error: operation #{op} on node #{opts[:node]} timed out. Timeout value used: #{opts[:timeout]}"}
+  end
+
+  defp format_error({:error, :timeout, msg}, opts, module) do
+    op = CommandModules.module_to_command(module)
+
+    {:error, ExitCodes.exit_code_for(:timeout),
+     "Error: operation #{op} on node #{opts[:node]} timed out: #{msg}. Timeout value used: #{opts[:timeout]}"}
   end
 
   # Plugins
@@ -536,6 +520,15 @@ defmodule RabbitMQCtl do
   end
 
   # Catch all clauses
+  defp format_error({:error, err}, %{formatter: "json"}, _) when is_map(err) do
+    {:ok, res} = JSON.encode(err)
+    {:error, ExitCodes.exit_unavailable(), res}
+  end
+  defp format_error({:error, exit_code, err}, %{formatter: "json"}, _) when is_map(err) do
+    {:ok, res} = JSON.encode(err)
+    {:error, exit_code, res}
+  end
+
   defp format_error({:error, exit_code, err}, _, _) do
     string_err = Helpers.string_or_inspect(err)
 

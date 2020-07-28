@@ -1,20 +1,14 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
-defmodule Rabbitmq.CLI.AutoComplete do
+defmodule RabbitMQ.CLI.AutoComplete do
   alias RabbitMQ.CLI.Core.{CommandModules, Parser}
+
+  # Use the same jaro distance limit as in Elixir's "did you mean?"
+  @jaro_distance_limit 0.77
 
   @spec complete(String.t(), [String.t()]) :: [String.t()]
   def complete(_, []) do
@@ -28,6 +22,26 @@ defmodule Rabbitmq.CLI.AutoComplete do
 
       _ ->
         complete(["--script-name", script_name | args])
+    end
+  end
+
+  def suggest_command(_cmd_name, empty) when empty == %{} do
+    nil
+  end
+  def suggest_command(typed, module_map) do
+    suggestion =
+      module_map
+      |> Map.keys()
+      |> Enum.map(fn existing ->
+        {existing, String.jaro_distance(existing, typed)}
+      end)
+      |> Enum.max_by(fn {_, distance} -> distance end)
+
+    case suggestion do
+      {cmd, distance} when distance >= @jaro_distance_limit ->
+        {:suggest, cmd}
+      _ ->
+        nil
     end
   end
 

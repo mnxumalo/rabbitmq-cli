@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Ctl.Commands.EncodeCommand do
   alias RabbitMQ.CLI.Core.{DocGuide, Helpers}
@@ -30,19 +21,16 @@ defmodule RabbitMQ.CLI.Ctl.Commands.EncodeCommand do
   def distribution(_), do: :none
 
   def merge_defaults(args, opts) do
-    {args,
-     Map.merge(
-       %{
+    with_defaults = Map.merge(%{
          cipher: :rabbit_pbe.default_cipher(),
          hash: :rabbit_pbe.default_hash(),
          iterations: :rabbit_pbe.default_iterations()
-       },
-       opts
-     )}
+       }, opts)
+    {args, with_defaults}
   end
 
   def validate(args, _) when length(args) < 2 do
-    {:validation_failure, {:bad_argument, "Please provide a value to decode and a passphrase."}}
+    {:validation_failure, {:not_enough_args, "Please provide a value to decode and a passphrase."}}
   end
 
   def validate(args, _) when length(args) > 2 do
@@ -68,8 +56,8 @@ defmodule RabbitMQ.CLI.Ctl.Commands.EncodeCommand do
   def run([value, passphrase], %{cipher: cipher, hash: hash, iterations: iterations}) do
     try do
       term_value = Helpers.evaluate_input_as_term(value)
-      result = :rabbit_pbe.encrypt_term(cipher, hash, iterations, passphrase, term_value)
-      {:ok, {:encrypted, result}}
+      result = {:encrypted, _} = :rabbit_pbe.encrypt_term(cipher, hash, iterations, passphrase, term_value)
+      {:ok, result}
     catch
       _, _ ->
         {:error, "Error during cipher operation."}

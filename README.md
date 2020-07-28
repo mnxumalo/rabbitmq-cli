@@ -1,5 +1,7 @@
 # RabbitMQ CLI Tools
 
+[![Build Status](https://travis-ci.org/rabbitmq/rabbitmq-cli.svg?branch=master)](https://travis-ci.org/rabbitmq/rabbitmq-cli)
+
 This repository contains [RabbitMQ CLI tools](https://rabbitmq.com/cli.html) ([rabbitmqctl](https://www.rabbitmq.com/man/rabbitmqctl.1.man.html) and
 others).
 
@@ -31,8 +33,8 @@ Please use the version of CLI tools that come with the RabbitMQ distribution ver
 
 Building this project requires
 
- * Erlang/OTP 20.3 (or later)
- * [Elixir](https://elixir-lang.org/) 1.7.0 (or later).
+ * Erlang/OTP 21.3 (or later)
+ * [Elixir](https://elixir-lang.org/) 1.10.0 (or later).
 
 Command line tools depend on [rabbitmq-common](https://github.com/rabbitmq/rabbitmq-common).
 Dependencies are being resolved by `erlang.mk`
@@ -123,5 +125,5 @@ but not entirely trivial examples.
 The project is [licensed under the MPL](LICENSE-MPL-RabbitMQ), the same license
 as RabbitMQ.
 
-(c) Pivotal Software, Inc, 2016-2019.
+(c) 2007-2020 VMware, Inc. or its affiliates.
 

@@ -1,24 +1,12 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is GoPivotal, Inc.
-## Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Core.Parser do
   alias RabbitMQ.CLI.{CommandBehaviour, FormatterBehaviour}
   alias RabbitMQ.CLI.Core.{CommandModules, Config}
-
-  # Use the same jaro distance limit as in Elixir `did_you_mean`
-  @jaro_distance_limit 0.77
 
   def default_switches() do
     [
@@ -88,6 +76,13 @@ defmodule RabbitMQ.CLI.Core.Parser do
 
         {command_module, command_name, cmd_arguments, cmd_options, cmd_invalid}
     end
+  end
+
+  def command_suggestion(_cmd_name, empty) when empty == %{} do
+    nil
+  end
+  def command_suggestion(typed, module_map) do
+    RabbitMQ.CLI.AutoComplete.suggest_command(typed, module_map)
   end
 
   defp look_up_command(parsed_args, options) do
@@ -161,27 +156,6 @@ defmodule RabbitMQ.CLI.Core.Parser do
       {:error, err} ->
         IO.puts(:stderr, "Error reading aliases file #{aliases_file}: #{err}")
         %{}
-    end
-  end
-
-  defp command_suggestion(_cmd_name, empty) when empty == %{} do
-    nil
-  end
-
-  defp command_suggestion(typed, module_map) do
-    suggestion =
-      module_map
-      |> Map.keys()
-      |> Enum.map(fn existing ->
-        {existing, String.jaro_distance(existing, typed)}
-      end)
-      |> Enum.max_by(fn {_, distance} -> distance end)
-
-    case suggestion do
-      {cmd, distance} when distance >= @jaro_distance_limit ->
-        {:suggest, cmd}
-      _ ->
-        nil
     end
   end
 

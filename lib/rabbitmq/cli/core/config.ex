@@ -1,17 +1,8 @@
-## The contents of this file are subject to the Mozilla Public License
-## Version 1.1 (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License
-## at https://www.mozilla.org/MPL/
+## This Source Code Form is subject to the terms of the Mozilla Public
+## License, v. 2.0. If a copy of the MPL was not distributed with this
+## file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ##
-## Software distributed under the License is distributed on an "AS IS"
-## basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
-## the License for the specific language governing rights and
-## limitations under the License.
-##
-## The Original Code is RabbitMQ.
-##
-## The Initial Developer of the Original Code is Pivotal Software, Inc.
-## Copyright (c) 2016-2019 Pivotal Software, Inc.  All rights reserved.
+## Copyright (c) 2016-2020 VMware, Inc. or its affiliates.  All rights reserved.
 
 defmodule RabbitMQ.CLI.Core.Config do
 
@@ -42,13 +33,13 @@ defmodule RabbitMQ.CLI.Core.Config do
   def normalise(:node, nil), do: nil
 
   def normalise(:node, node) when not is_atom(node) do
-    Rabbitmq.Atom.Coerce.to_atom(node)
+    RabbitMQ.CLI.Core.DataCoercion.to_atom(node)
   end
 
   def normalise(:erlang_cookie, nil), do: nil
 
   def normalise(:erlang_cookie, c) when not is_atom(c) do
-    Rabbitmq.Atom.Coerce.to_atom(c)
+    RabbitMQ.CLI.Core.DataCoercion.to_atom(c)
   end
 
   def normalise(:longnames, true), do: :longnames
@@ -64,10 +55,6 @@ defmodule RabbitMQ.CLI.Core.Config do
     |> String.to_atom()
   end
 
-  def get_system_option(:node, _) do
-      System.get_env("RABBITMQ_NODENAME")
-  end
-
   def get_system_option(:aliases_file, _) do
       System.get_env("RABBITMQ_CLI_ALIASES_FILE")
   end
@@ -76,25 +63,29 @@ defmodule RabbitMQ.CLI.Core.Config do
       System.get_env("RABBITMQ_ERLANG_COOKIE")
   end
 
+  def get_system_option(:node, %{offline: true} = opts) do
+      remote_node = case opts[:node] do
+        nil -> nil
+        val -> Helpers.normalise_node_option(val, opts[:longnames], opts)
+      end
+      context = get_env_context(remote_node, true)
+      get_val_from_env_context(context, :node)
+  end
+  def get_system_option(:node, opts) do
+      remote_node = case opts[:node] do
+        nil -> nil
+        val -> Helpers.normalise_node_option(val, opts[:longnames], opts)
+      end
+      context = get_env_context(remote_node, false)
+      get_val_from_env_context(context, :node)
+  end
+
   def get_system_option(name, opts) do
     work_offline = opts[:offline] == true
     remote_node = case name do
-      :longnames ->
-        nil
-      :rabbitmq_home ->
-        nil
-      _ ->
-        case opts[:node] do
-          nil ->
-            # Just in case `opts` was not normalized yet (to get the
-            # default node), we do it here as well.
-            case Helpers.normalise_node_option(opts) do
-              {:error, _}            -> nil
-              {:ok, normalized_opts} -> normalized_opts[:node]
-            end
-          node ->
-            node
-        end
+      :longnames -> nil
+      :rabbitmq_home -> nil
+      _ -> node_flag_or_default(opts)
     end
     context = get_env_context(remote_node, work_offline)
     val0 = get_val_from_env_context(context, name)
@@ -113,21 +104,19 @@ defmodule RabbitMQ.CLI.Core.Config do
     end
   end
 
+  def get_env_context(nil, _) do
+    :rabbit_env.get_context()
+  end
   def get_env_context(remote_node, work_offline) do
-    query_remote = remote_node != nil
-    case query_remote do
-      true ->
-        case work_offline do
-          true  -> :rabbit_env.get_context(:offline)
-          false -> :rabbit_env.get_context(remote_node)
-        end
-      false ->
-        :rabbit_env.get_context()
+    case work_offline do
+      true  -> :rabbit_env.get_context(:offline)
+      false -> :rabbit_env.get_context(remote_node)
     end
   end
 
   def get_val_from_env_context(context, name) do
     case name do
+      :node -> context[:nodename]
       :longnames -> context[:nodename_type] == :longnames
       :rabbitmq_home -> context[:rabbitmq_home]
       :mnesia_dir -> context[:mnesia_dir]
@@ -135,6 +124,19 @@ defmodule RabbitMQ.CLI.Core.Config do
       :plugins_expand_dir -> context[:plugins_expand_dir]
       :feature_flags_file -> context[:feature_flags_file]
       :enabled_plugins_file -> context[:enabled_plugins_file]
+    end
+  end
+
+  def node_flag_or_default(opts) do
+    case opts[:node] do
+      nil ->
+        # Just in case `opts` was not normalized yet (to get the
+        # default node), we do it here as well.
+        case Helpers.normalise_node_option(opts) do
+          {:error, _}            -> nil
+          {:ok, normalized_opts} -> normalized_opts[:node]
+        end
+      node -> node
     end
   end
 
